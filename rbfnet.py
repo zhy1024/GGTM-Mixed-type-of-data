@@ -120,7 +120,7 @@ def rbfprior(rbfunc, nin, nhidden, nout):
 	corresponding group or not.
     """
     nwts_layer2 = nout + (nhidden *nout)
-    if rbfunc == 'gaussian':
+    if rbfunc == ['gaussian']:
         nwts_layer1 = nin*nhidden + nhidden
     else:
         print('Undefined activation function')
@@ -128,7 +128,7 @@ def rbfprior(rbfunc, nin, nhidden, nout):
     mask = [np.zeros((nwts_layer1, 1)), np.ones((nwts_layer2, 1))]
     indx = np.zeros((nwts, 2))
     mark2 = nwts_layer1 + (nhidden * nout)
-    indx[nwts_layer1:mark2, 1] = np.ones((nhidden * nout, 1))
-    indx[mark2:nwts, 2] = np.ones((nout, 1))
+    indx[nwts_layer1:mark2, 0] = np.ones(nhidden * nout)
+    indx[mark2:nwts, 1] = np.ones(nout)
     prior ={'index':indx}
     return mask, prior
