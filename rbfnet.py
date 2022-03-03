@@ -97,7 +97,7 @@ def rbffwd(x, net):
     return a, z, n2
 
 
-def rbfprior(rbfunc, nin, nhidden, nout, aw2, ab2):
+def rbfprior(rbfunc, nin, nhidden, nout):
     """Description
 	[MASK, PRIOR] = RBFPRIOR(RBFUNC, NIN, NHIDDEN, NOUT, AW2, AB2)
 	generates a vector MASK  that selects only the output layer weights.
@@ -128,7 +128,7 @@ def rbfprior(rbfunc, nin, nhidden, nout, aw2, ab2):
     mask = [np.zeros((nwts_layer1, 1)), np.ones((nwts_layer2, 1))]
     indx = np.zeros((nwts, 2))
     mark2 = nwts_layer1 + (nhidden * nout)
-    indx[nwts_layer1 + 1:mark2, 1] = np.ones((nhidden * nout, 1))
-    indx[mark2 + 1:nwts, 2] = np.ones((nout, 1))
-    prior ={'index':indx, 'alpha': [aw2, ab2]}
+    indx[nwts_layer1:mark2, 1] = np.ones((nhidden * nout, 1))
+    indx[mark2:nwts, 2] = np.ones((nout, 1))
+    prior ={'index':indx}
     return mask, prior
