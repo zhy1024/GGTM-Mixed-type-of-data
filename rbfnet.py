@@ -43,11 +43,11 @@ def rbfunpak(w , net):
     mark1 = nin*nhidden
     net['c'] = np.reshape(w[0,0:mark1],(nhidden,nin))
     mark2 = mark1 + nhidden
-    net['wi'] = np.reshape(w[0, mark1+1:mark2],(1,nhidden))
+    net['wi'] = np.reshape(w[0, mark1:mark2],(1,nhidden))
     mark3 = mark2 + nhidden*nout
-    net['w2'] = np.reshape(w[0,mark2+1:mark3],(nhidden, nout))
+    net['w2'] = np.reshape(w[0,mark2:mark3],(nhidden, nout))
     mark4 = mark3 + nout
-    net['b2'] = np.reshape(w[0,mark3+1:mark4],(1,nout))
+    net['b2'] = np.reshape(w[0,mark3:mark4],(1,nout))
 
 
 
@@ -68,7 +68,7 @@ def rbfsetfw(net, scale):
         widths = scale*np.mean(min(cdist))
     else:
         widths = max(max(cdist))
-    
+
     net['wi'] = widths * np.ones(np.shape(net['wi']))
 
 
@@ -87,16 +87,16 @@ def rbffwd(x, net):
 	matrix N2 is the squared distances between each basis function centre
 	and each pattern in which each row corresponds to a data point.
     """
-    
-    
+
+
     ndata = np.shape(x)
     n2 = np.linalg.norm(x - net['c'])
     wi2 = np.ones(3,1)*(2*net['wi'])
     z = np.exp(-(n2/wi2))
     a = z*net['w2'] + np.ones(ndata,1)*net['b2']
     return a, z, n2
-    
-    
+
+
 def rbfprior(rbfunc, nin, nhidden, nout, aw2, ab2):
     """Description
 	[MASK, PRIOR] = RBFPRIOR(RBFUNC, NIN, NHIDDEN, NOUT, AW2, AB2)
@@ -132,4 +132,3 @@ def rbfprior(rbfunc, nin, nhidden, nout, aw2, ab2):
     indx[mark2 + 1:nwts, 2] = np.ones((nout, 1))
     prior ={'index':indx, 'alpha': [aw2, ab2]}
     return mask, prior
-    
