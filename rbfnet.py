@@ -132,3 +132,15 @@ def rbfprior(rbfunc, nin, nhidden, nout):
     indx[mark2:nwts, 1] = np.ones(nout)
     prior ={'index':indx}
     return mask, prior
+
+def gtm_rctg(samp_size):
+    xDim = samp_size[0]
+    yDim = samp_size[1]
+    X,Y = np.meshgrid(np.linspace(0,xDim-1,xDim),np.linspace(yDim-1,0,xDim))
+    X = np.concatenate(X.T.reshape(-1,1))
+    Y = np.concatenate(Y.T.reshape(-1,1))
+    sample = [X,Y]
+    maxXY = [np.max(X),np.max(Y)]
+    sample[0] = 2 * (sample[0]-maxXY[0]/2)/maxXY[0]
+    sample[1] = 2 * (sample[1]-maxXY[1]/2)/maxXY[1]
+    return sample

@@ -163,7 +163,7 @@ def ApplyPCAInitW(obs,tempdata,dim_latent,X):
     return w2
 
 
-def ggtminit(net, options, data_array, samp_type , latent_shape, rbf_grid):
+def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
 
     """Description
 	NET = GGTMINIT(NET, OPTIONS, DATA_ARRAY, SAMPTYPE) takes a Generalised
