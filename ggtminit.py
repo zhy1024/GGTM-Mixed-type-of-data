@@ -41,6 +41,7 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
     ndata_space = np.shape(dim_data_array)[0]
     net['dim_latent'] = dim_latent
     obs = {}
+    obs_array = []
     for i in range(0,ndata_space):
         obs['nin'] = dim_data_array[i]
         if mapping['type'] == ['rbf']:
@@ -60,8 +61,10 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
 
 
         obs['covar_type'] = mix_array[i]['covar_type']
+        obs_array.append(obs)
 
     net['X'] = []
+    net['obs_array'] = obs_array
     return net
 
 
@@ -185,21 +188,24 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     nlatent = 64
     if samp_type == 'regular':
         l_samp_size = latent_shape
+        rbf_samp_size = rbf_grid
+        print(net.keys())
         if net['dim_latent'] == 1:
             net['X'] = np.arange(-1,1,l_samp_size - 1)
         elif net['dim_latent'] == 2:
             net['X'] = rn.gtm_rctg(l_samp_size)
+            # print(len(net['obs_array']))
+            # net['obs_array']['c'] = rn.gtm_rctg(rbf_samp_size)
         else:
             print('For regular sample, input dimension must be 1 or 2.')
     else:
         print('Invalid sample type')
 
-    rbf_samp_size = rbf_grid
     return net
 
 
 from scipy import sparse
-def ggtmem(net, t_array, options, fsoptions):
+def ggtmem(net, t_array):
     """Description
 	[NET, OPTIONS, ERRLOG, T_ARRAY] = GGTMEM(NET, T_ARRAY, OPTIONS, FSOPTIONS)
     uses the Expectation Maximization algorithm to estimate the parameters of
@@ -305,7 +311,7 @@ def ggtmpost(net, data_array):
             obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
         elif obs['type'] == 'dicrete':
-            obs['mix']['centres'], tmp_Phi = rn.rnffwd(obs['mapping'],net['X'])
+            obs['mix']['centres'], tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
             Phi = [tmp_Phi, np.ones([np.shape(net['X'])[0],1])]
             W = [obs['mapping']['w2'], obs['mapping']['b2']]
             if obs['dist_type'] == 'bernoulli':

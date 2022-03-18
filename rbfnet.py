@@ -48,7 +48,7 @@ def rbfunpak(w , net):
     net['w2'] = np.reshape(w[0,mark2:mark3],(nhidden, nout))
     mark4 = mark3 + nout
     net['b2'] = np.reshape(w[0,mark3:mark4],(1,nout))
-
+    return net
 
 
 
@@ -72,7 +72,7 @@ def rbfsetfw(net, scale):
     net['wi'] = widths * np.ones(np.shape(net['wi']))
 
 
-def rbffwd(x, net):
+def rbffwd(net, x):
     """Description
 	A = RBFFWD(NET, X) takes a network data structure NET and a matrix X
 	of input vectors and forward propagates the inputs through the
@@ -88,8 +88,7 @@ def rbffwd(x, net):
 	and each pattern in which each row corresponds to a data point.
     """
 
-
-    ndata = np.shape(x)
+    data_dim, ndata = np.shape(x)
     n2 = np.linalg.norm(x - net['c'])
     wi2 = np.ones(3,1)*(2*net['wi'])
     z = np.exp(-(n2/wi2))
@@ -128,8 +127,8 @@ def rbfprior(rbfunc, nin, nhidden, nout):
     mask = [np.zeros((nwts_layer1, 1)), np.ones((nwts_layer2, 1))]
     indx = np.zeros((nwts, 2))
     mark2 = nwts_layer1 + (nhidden * nout)
-    indx[nwts_layer1:mark2, 0] = np.ones(nhidden * nout)
-    indx[mark2:nwts, 1] = np.ones(nout)
+    indx[nwts_layer1:mark2, 0] = np.ones((nhidden * nout,))
+    indx[mark2:nwts, 1] = np.ones((nout,))
     prior ={'index':indx}
     return mask, prior
 

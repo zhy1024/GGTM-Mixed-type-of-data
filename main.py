@@ -45,6 +45,7 @@ df_2 = pd.read_csv("bin_train_data.csv")
 bin_train_data = df_2.drop(index = 0, columns = ['ID','Label']).astype(float)
 bin_data = bin_train_data.to_numpy()
 bdata = {'mat':bin_data, 'type':'discrete', 'nvar':bin_data.shape[1]}
+print(bin_data.shape[1])
 #mixture model
 bmix = {'type': 'dmm', 'covar_type': 'spherical','dist_type': 'bernoulli','cat_nvals': 2}
 
