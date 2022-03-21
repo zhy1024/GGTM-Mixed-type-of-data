@@ -40,10 +40,11 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
     net['type'] = 'ggtm'
     ndata_space = np.shape(dim_data_array)[0]
     net['dim_latent'] = dim_latent
-    obs = {}
     obs_array = []
     for i in range(0,ndata_space):
+        obs = {}
         obs['nin'] = dim_data_array[i]
+
         if mapping['type'] == ['rbf']:
             prior = mapping['prior']
         obs['mapping'] = rn.rbf(dim_latent, mapping['ncentres'], dim_data_array[i],
@@ -61,12 +62,12 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
 
 
         obs['covar_type'] = mix_array[i]['covar_type']
+        # print(obs['nin'])
         obs_array.append(obs)
 
     net['X'] = []
     net['obs_array'] = obs_array
     return net
-
 
 def ggtminitsubmodel(net,obs, dim_latent, X, options, data, samp_type, rbf_samp_size,varargin = None):
 
@@ -105,7 +106,7 @@ def ggtminitsubmodel(net,obs, dim_latent, X, options, data, samp_type, rbf_samp_
 
     data_mat = data['mat']
     nrow, ncol = np.shape(data_mat)
-    obs['c'] = mm.gtm_rctg(rbf_samp_size)
+    obs['c'] = gtm_rctg(rbf_samp_size)
     obs['mapping'] = rn.rbfsetfw(obs['mapping'])
     from sklearn.decomposition import PCA
     pca = PCA()
@@ -189,13 +190,12 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     if samp_type == 'regular':
         l_samp_size = latent_shape
         rbf_samp_size = rbf_grid
-        print(net.keys())
         if net['dim_latent'] == 1:
             net['X'] = np.arange(-1,1,l_samp_size - 1)
         elif net['dim_latent'] == 2:
             net['X'] = rn.gtm_rctg(l_samp_size)
-            # print(len(net['obs_array']))
-            # net['obs_array']['c'] = rn.gtm_rctg(rbf_samp_size)
+            for i in range (len(net['obs_array'])):
+                net['obs_array'][i]['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
         else:
             print('For regular sample, input dimension must be 1 or 2.')
     else:
@@ -233,6 +233,7 @@ def ggtmem(net, t_array):
         ndata, tdim = np.shape(t)
         ND[0][i] = ndata*tdim
         if obs['type'] == 'continuous':
+            print(var_array)
             var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
             PhiT = [var_array[i]['Phi1'],np.ones((np.shape(net['X'])[0],1))]
             var_array[i]['PhiT'] = np.tranpose(PhiT)
@@ -244,6 +245,7 @@ def ggtmem(net, t_array):
                 var_array[i]['Alpha'][Mplus1][Mplus1] = 0
 
         elif obs['type'] == 'discrete':
+            # print(obs['mapping'], net['X'])
             var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
             PhiT = [var_array[i]['Phi1'],np.ones((np.shape(net['X'])[0],1))]
             var_array[i]['PhiT'] = np.tranpose(PhiT)

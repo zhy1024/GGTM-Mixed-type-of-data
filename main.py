@@ -7,7 +7,6 @@ from collections import Counter
 from ggtminit import *
 from mixmodel import *
 
-
 dim_latent = 2
 latent_shape = [8,8]
 nlatent = np.prod(latent_shape)
@@ -45,29 +44,34 @@ df_2 = pd.read_csv("bin_train_data.csv")
 bin_train_data = df_2.drop(index = 0, columns = ['ID','Label']).astype(float)
 bin_data = bin_train_data.to_numpy()
 bdata = {'mat':bin_data, 'type':'discrete', 'nvar':bin_data.shape[1]}
-print(bin_data.shape[1])
 #mixture model
 bmix = {'type': 'dmm', 'covar_type': 'spherical','dist_type': 'bernoulli','cat_nvals': 2}
 
-#Categorical data
-df_3 = pd.read_csv("cat_train_data.csv")
-cat_train_data = df_3.drop(index = 0, columns = ['ID','Label']).astype(float)
-cat_data = cat_train_data.to_numpy()
-cat_count = len(Counter(df_3['Label']))-1
-cadata = {'mat' : cat_data, 'cat_nvals': cat_count, 'type': 'discrete', 'nvar' : cat_data.shape[1]}
-#Mixture model
-camix = {'type': 'dmm', 'covar_type': 'spherical', 'dist_type': 'categorical',
-       'cat_nvals':cadata['cat_nvals']}
+#Multinomial data
+# df_3 = pd.read_csv("cat_train_data.csv")
+# mult_train_data = df_3.drop(index = 0, columns = ['ID','Label']).astype(float)
+# mult_data = mult_train_data.to_numpy()
 
+df_4 = pd.read_csv("mult_train_data.csv")
+mdata_mat = df_4.to_numpy()
+
+mdata = {'mat' : mdata_mat, 'cat_nvals': [8, 16], 'start_inds': [1, 9],
+        'end_inds': [8, 24], 'type': 'discrete', 'nvar' : 24}
+
+
+
+#Mixture model
+mmix = {'type': 'dmm', 'covar_type': 'spherical', 'dist_type': 'multinomial',
+       'cat_nvals':mdata['cat_nvals']}
 # Creationg of Data Array
-data_array = np.array([cdata, bdata, cadata])
+data_array = np.array([cdata, bdata, mdata])
 ndata = data_array.shape[0]
 dim_data_array = []
 for i in range(0, ndata):
     dim_data_array.append(data_array[i]['nvar'])
 
 #Creationg of  Mixture models array
-mix_array = np.array([cmix, bmix, camix])
+mix_array = np.array([cmix, bmix, mmix])
 
 # Create and initialise GTM model
 net = ggtm(dim_latent, nlatent, dim_data_array, Mapping, mix_array)

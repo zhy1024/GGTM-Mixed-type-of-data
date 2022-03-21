@@ -88,11 +88,11 @@ def rbffwd(net, x):
 	and each pattern in which each row corresponds to a data point.
     """
 
-    data_dim, ndata = np.shape(x)
-    n2 = np.linalg.norm(x - net['c'])
-    wi2 = np.ones(3,1)*(2*net['wi'])
+    ndata, date_dim = np.shape(x)
+    n2 = dist2(x,net['c'])
+    wi2 = np.ones((ndata,1)) * (2 * net['wi'])
     z = np.exp(-(n2/wi2))
-    a = z*net['w2'] + np.ones(ndata,1)*net['b2']
+    a = np.dot(z,net['w2']) + np.ones((ndata,1))*net['b2']
     return a, z, n2
 
 
@@ -138,8 +138,23 @@ def gtm_rctg(samp_size):
     X,Y = np.meshgrid(np.linspace(0,xDim-1,xDim),np.linspace(yDim-1,0,xDim))
     X = np.concatenate(X.T.reshape(-1,1))
     Y = np.concatenate(Y.T.reshape(-1,1))
-    sample = [X,Y]
+    sample = np.array([X,Y])
     maxXY = [np.max(X),np.max(Y)]
     sample[0] = 2 * (sample[0]-maxXY[0]/2)/maxXY[0]
     sample[1] = 2 * (sample[1]-maxXY[1]/2)/maxXY[1]
-    return sample
+    return sample.T
+
+def dist2(x,c):
+    ndata,dimx = np.shape(x)
+    ncentres,dimc = np.shape(c)
+    if (dimx != dimc):
+        print("Data dimension does not match dimension of centres")
+    x_sq_T = np.transpose([a*a for a in (x)])
+    sum_x = np.array([sum(a) for a in zip(*x_sq_T)]).reshape(-1,1)
+    x2 = np.ones(ncentres,) * sum_x
+    c_sq_T = np.transpose([a*a for a in (c)])
+    sum_c = np.array([sum(a) for a in zip(*c_sq_T)]).reshape(-1,1)
+    c2 = np.transpose(np.ones(ndata,) * sum_c)
+    temp = 2 * np.dot(x, np.transpose(c))
+    n2 = x2+c2-temp
+    return n2
