@@ -1,4 +1,5 @@
 import numpy as np
+import rbfnet as rn
 
 
 
@@ -51,7 +52,7 @@ def gmm(dim, ncentres, covar_type):
     mix['nwts'] = ncentres + ncentres*dim + ncentres
     return mix
 
-def gmmactiv(x, mix):
+def gmmactiv(mix, x):
     """Description
 	This function computes the activations A (i.e. the  probability
 	P(X|J) of the data conditioned on each component density)  for a
@@ -64,8 +65,10 @@ def gmmactiv(x, mix):
     
     ndata = np.shape(x)[0]
     a = np.zeros(ndata, mix['ncentres'])
-    
-    n2 = np.linalg.norm(x - mix['centres']) # dist2
+    # mix_c = np.array(mix['centres'],dtype = object)
+    # print(mix_c, mix_c.shape)
+    # print(len(mix['centres'][0]), len(mix['centres'][0][1]))
+    n2 = rn.dist2(x, mix['centres']) # dist2
     n2 = np.array(n2)
     wi2 = np.ones((ndata,1))*  (2* mix['covars'])
     nr, nc = np.shape(wi2)
@@ -78,7 +81,7 @@ def gmmactiv(x, mix):
     a = np.exp((-n2/wi2)/normal)
     return a
 
-def gmmpost(x,mix):
+def gmmpost(mix,x):
     """	Description
 	This function computes the posteriors POST (i.e. the probability of
 	each component conditioned on the data P(J|X)) for a Gaussian mixture
@@ -86,8 +89,7 @@ def gmmpost(x,mix):
 	matrix X contains the data vectors.  Each row of X represents a
 	single vector.
     """
-    
-    
+
     ndata = np.shape(x)[0]
     a = gmmactiv(mix, x)
     old_post = np.ones((ndata,1))*mix['priors']*a

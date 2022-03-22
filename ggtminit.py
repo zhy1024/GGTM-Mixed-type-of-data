@@ -2,7 +2,7 @@ import numpy as np
 import rbfnet as rn
 import mixmodel as mm
 
-def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
+def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
 
     """Description
 
@@ -39,18 +39,23 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
     net = {}
     net['type'] = 'ggtm'
     ndata_space = np.shape(dim_data_array)[0]
+
+    if ndata_space != np.shape(mix_array)[0]:
+        print("The length of MIX_ARRAY must match the number of data spaces.")
+
     net['dim_latent'] = dim_latent
     obs_array = []
     for i in range(0,ndata_space):
         obs = {}
         obs['nin'] = dim_data_array[i]
 
-        if mapping['type'] == ['rbf']:
-            prior = mapping['prior']
-        obs['mapping'] = rn.rbf(dim_latent, mapping['ncentres'], dim_data_array[i],
-                           mapping['func'], 'linear', prior)
-        obs['mask'] = rn.rbfprior(mapping['func'], dim_latent, mapping['ncentres'],
-                               dim_data_array[i])[0]
+        if map['type'] == ['rbf']:
+            prior = map['prior']
+
+        obs['mapping'] = rn.rbf(dim_latent, map['ncentres'], dim_data_array[i],
+                           map['func'], 'linear', prior)
+        obs['mapping']['mask'] = rn.rbfprior(map['func'], dim_latent, map['ncentres'],
+                               dim_data_array[i])
         if mix_array[i]['type'] == 'gmm':
             obs['type'] = 'continuous'
             obs['mix'] = mm.gmm(obs['nin'], nlatent, mix_array[i]['covar_type'])
@@ -69,7 +74,7 @@ def ggtm(dim_latent, nlatent, dim_data_array, mapping, mix_array):
     net['obs_array'] = obs_array
     return net
 
-def ggtminitsubmodel(net,obs, dim_latent, X, options, data, samp_type, rbf_samp_size,varargin = None):
+def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,varargin = None):
 
 
     """Description
@@ -106,18 +111,27 @@ def ggtminitsubmodel(net,obs, dim_latent, X, options, data, samp_type, rbf_samp_
 
     data_mat = data['mat']
     nrow, ncol = np.shape(data_mat)
-    obs['c'] = gtm_rctg(rbf_samp_size)
-    obs['mapping'] = rn.rbfsetfw(obs['mapping'])
+
+    nhidden = obs['mapping']['nhidden']
+    if samp_type == 'regular':
+        # ignore dim_latent = 1
+        if dim_latent == 2:
+            obs['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
+            obs['mapping'] = rn.rbfsetfw(obs['mapping'], 1)
+
     from sklearn.decomposition import PCA
     pca = PCA()
     pca.fit(data_mat)
     PCcoeff = pca.explained_variance_
-    PCvec = np.transpose(pca.components_)
-    A = PCvec[:,1:dim_latent]*np.diag(np.sqrt(PCcoeff[1:dim_latent]))
-    Phi = rbffwd(X, obs['mapping'])[2]
-    normX = (X - np.ones(np.shape(X))*np.diag(np.mean(X)))*np.diag(1/np.std(X))
+    PCvec = pca.components_.T
+    A = np.dot(PCvec[:,0:dim_latent],np.diag(np.sqrt(PCcoeff[0:dim_latent])))
+    Phi = rn.rbffwd(obs['mapping'],X)[1]
+    x_std_array = 1/np.std(X, axis=0, ddof=1)
+    x_mean_diag = np.diag(np.mean(X,axis = 0))
+    temp1 = np.dot(X - np.ones(np.shape(X)),x_mean_diag)
+    normX = np.dot(temp1,np.diag(x_std_array))
     A_T = np.transpose(A)
-    obs['w2'] = np.linalg.lstsq(Phi,normX*A_T,rcond=None)[0]
+    obs['w2'] = np.linalg.lstsq(Phi,np.dot(normX,A_T),rcond=None)[0]
 
     obs['b2'] = np.mean(data_mat)
     if obs['type'] == 'continuous':
@@ -186,7 +200,7 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     """
 
     ndata = np.shape(data_array)[0]
-    nlatent = 64
+    nlatent = net['obs_array'][1]['mix']['ncentres']
     if samp_type == 'regular':
         l_samp_size = latent_shape
         rbf_samp_size = rbf_grid
@@ -194,12 +208,20 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
             net['X'] = np.arange(-1,1,l_samp_size - 1)
         elif net['dim_latent'] == 2:
             net['X'] = rn.gtm_rctg(l_samp_size)
-            for i in range (len(net['obs_array'])):
-                net['obs_array'][i]['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
+            # for i in range (len(net['obs_array'])):
+            #     net['obs_array'][i]['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
+            #     print(net['obs_array'][i]['mapping']['c'])
         else:
             print('For regular sample, input dimension must be 1 or 2.')
     else:
         print('Invalid sample type')
+
+    nobs_space = len(net['obs_array'])
+    if nobs_space != ndata:
+        print("The number of observation spaces must match the number of data")
+
+    for i in range (nobs_space):
+        net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
 
     return net
 
@@ -233,22 +255,22 @@ def ggtmem(net, t_array):
         ndata, tdim = np.shape(t)
         ND[0][i] = ndata*tdim
         if obs['type'] == 'continuous':
-            print(var_array)
             var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
-            PhiT = [var_array[i]['Phi1'],np.ones((np.shape(net['X'])[0],1))]
-            var_array[i]['PhiT'] = np.tranpose(PhiT)
+            one = np.ones((np.shape(net['X'])[0],1))
+            PhiT = np.hstack((var_array[i]['Phi'],one))
+            var_array[i]['PhiT'] = np.transpose(PhiT)
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
             var_array[i]['A'] = np.zeros((Mplus1, Mplus1))
-            if obs['map']['alpha'] > 0 :
+            if obs['mapping']['alpha'] > 0 :
                 eyeMat = sparse.eye(Mplus1).toarray()
-                var_array[i]['Alpha'] = obs['map']['alpha']*eyeMat
-                var_array[i]['Alpha'][Mplus1][Mplus1] = 0
+                var_array[i]['Alpha'] = obs['mapping']['alpha']*eyeMat
+                var_array[i]['Alpha'][Mplus1-1][Mplus1-1] = 0
 
         elif obs['type'] == 'discrete':
-            # print(obs['mapping'], net['X'])
             var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
-            PhiT = [var_array[i]['Phi1'],np.ones((np.shape(net['X'])[0],1))]
-            var_array[i]['PhiT'] = np.tranpose(PhiT)
+            one = np.ones((np.shape(net['X'])[0], 1))
+            PhiT = np.hstack((var_array[i]['Phi'],one))
+            var_array[i]['PhiT'] = np.transpose(PhiT)
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
             var_array[i]['K'] = K[0][i]
             obs['w'] = [obs['mapping']['w2'],obs['mapping']['b2']]
@@ -300,12 +322,12 @@ def ggtmpost(net, data_array):
 
     """
     """
-    ntotaldata = np.shape(data_array)[1]
-    nobs_space = np.shape(net['obs_array'])[1]
-    a = np.shaple(data_array[0]['mat'])[0]
+    ntotaldata = np.shape(data_array)[0]
+    nobs_space = np.shape(net['obs_array'])[0]
+    a = np.shape(data_array[0]['mat'])[0]
     b = net['obs_array'][0]['mix']['ncentres']
-    post_array = np.shape([a, b, nobs_space])
-    a_array = np.zero([np.shape(post_array)])
+    post_array = np.zeros(shape = (a, b, nobs_space))
+    a_array = np.zeros(shape = np.shape(post_array))
     for i in range(0,nobs_space):
         obs = net['obs_array'][i]
         data = data_array[i]

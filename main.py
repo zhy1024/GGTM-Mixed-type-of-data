@@ -16,14 +16,14 @@ rbf_prior = 0.01
 samp_type = 'regular'
 
 #Mapping function
-Mapping = {}
-Mapping['type'] = []
-Mapping['type'].append('rbf')
+map = {}
+map['type'] = []
+map['type'].append('rbf')
 # Mapping['type'].append('gp')
-Mapping['func'] = []
-Mapping['func'].append('gaussian')
-Mapping['ncentres'] = num_rbf_centres
-Mapping['prior'] = rbf_prior
+map['func'] = []
+map['func'].append('gaussian')
+map['ncentres'] = num_rbf_centres
+map['prior'] = rbf_prior
 
 #Data loading
 #Continuous data
@@ -74,7 +74,7 @@ for i in range(0, ndata):
 mix_array = np.array([cmix, bmix, mmix])
 
 # Create and initialise GTM model
-net = ggtm(dim_latent, nlatent, dim_data_array, Mapping, mix_array)
+net = ggtm(dim_latent, nlatent, dim_data_array, map, mix_array)
 
 net = ggtminit(net, data_array, samp_type, latent_shape,rbf_grid)
 

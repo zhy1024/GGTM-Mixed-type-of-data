@@ -3,7 +3,7 @@ import numpy as np
 import sys
 
 #Constructing rbf network
-def rbf(nin, nhidden, nout, actfn, outfunc , prior = None, beta = None):
+def rbf(nin, nhidden, nout, rbfunc, outfunc , prior = None, beta = None):
     """Create a net structure of RBF, we use dictionary.
        nin, number of inputs
        nhidden, number of hidden units
@@ -18,17 +18,21 @@ def rbf(nin, nhidden, nout, actfn, outfunc , prior = None, beta = None):
     rbf_net['nin'] = nin
     rbf_net['nhidden'] = nhidden
     rbf_net['nout'] = nout
-    rbf_net['actfn'] = actfn
+    rbf_net['actfn'] = rbfunc
     rbf_net['outfunc'] = outfunc
     rbf_net['nwts' ] = nin*nhidden + (nhidden + 1)*nout + nhidden
     rbf_net['prior'] = prior
     rbf_net['beta'] = beta
     rbf_net['wi'] = np.ones(nhidden)
+    rbf_net['alpha'] = prior
     w = np.random.randn(1, rbf_net['nwts'])
-    net = rbfunpak(w, rbf_net)
+    net = rbfunpak(rbf_net, w)
+
+    if rbfunc == ['gaussian']:
+        net['wi'] = np.ones(nhidden,)
     return net
 
-def rbfunpak(w , net):
+def rbfunpak(net, w):
     """
     Description
 	NET = RBFUNPAK(NET, W) takes an RBF network data structure NET and  a
@@ -62,14 +66,15 @@ def rbfsetfw(net, scale):
 	basis functions do not have a width.
     """
     real_max = sys.float_info.max
-    cdist =  np.linalg.norm(net['c'] - net['c'])
-    if cdist > 0:
+    cdist =  dist2(net['c'], net['c'])
+    if scale > 0:
         cdist = cdist + real_max* np.eye(net['nhidden'])
-        widths = scale*np.mean(min(cdist))
+        widths = scale*np.mean(np.min(cdist))
     else:
         widths = max(max(cdist))
 
     net['wi'] = widths * np.ones(np.shape(net['wi']))
+    return net
 
 
 def rbffwd(net, x):
@@ -124,13 +129,14 @@ def rbfprior(rbfunc, nin, nhidden, nout):
     else:
         print('Undefined activation function')
     nwts = nwts_layer1 + nwts_layer2
-    mask = [np.zeros((nwts_layer1, 1)), np.ones((nwts_layer2, 1))]
-    indx = np.zeros((nwts, 2))
-    mark2 = nwts_layer1 + (nhidden * nout)
-    indx[nwts_layer1:mark2, 0] = np.ones((nhidden * nout,))
-    indx[mark2:nwts, 1] = np.ones((nout,))
-    prior ={'index':indx}
-    return mask, prior
+    mask = np.hstack((np.zeros(nwts_layer1),np.ones(nwts_layer2)))
+    # indx = np.zeros((nwts, 2))
+    # mark2 = nwts_layer1 + (nhidden * nout)
+    # indx[nwts_layer1:mark2, 0] = np.ones((nhidden * nout,))
+    # indx[mark2:nwts, 1] = np.ones((nout,))
+    # prior ={'index':indx}
+    # return mask, prior
+    return mask
 
 def gtm_rctg(samp_size):
     xDim = samp_size[0]
