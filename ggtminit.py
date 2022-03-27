@@ -1,6 +1,7 @@
 import numpy as np
 import rbfnet as rn
 import mixmodel as mm
+from utilities import *
 
 def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
 
@@ -61,6 +62,7 @@ def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
             obs['mix'] = mm.gmm(obs['nin'], nlatent, mix_array[i]['covar_type'])
         elif mix_array[i]['type'] == 'dmm':
             obs['type'] = 'discrete'
+            obs['dist_type'] = mix_array[i]['dist_type']
             obs['mix'] = mm.gmm(obs['nin'], nlatent, mix_array[i]['cat_nvals'])
         else:
             print(' unknown mixture model')
@@ -116,8 +118,9 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     if samp_type == 'regular':
         # ignore dim_latent = 1
         if dim_latent == 2:
-            obs['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
+            obs['mapping']['c'] = gtm_rctg(rbf_samp_size)
             obs['mapping'] = rn.rbfsetfw(obs['mapping'], 1)
+            # print(obs['mapping']['w2'])
 
     from sklearn.decomposition import PCA
     pca = PCA()
@@ -128,40 +131,42 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     Phi = rn.rbffwd(obs['mapping'],X)[1]
     x_std_array = 1/np.std(X, axis=0, ddof=1)
     x_mean_diag = np.diag(np.mean(X,axis = 0))
-    temp1 = np.dot(X - np.ones(np.shape(X)),x_mean_diag)
+    temp1 = X - np.dot(np.ones(np.shape(X)),x_mean_diag)
     normX = np.dot(temp1,np.diag(x_std_array))
-    A_T = np.transpose(A)
-    obs['w2'] = np.linalg.lstsq(Phi,np.dot(normX,A_T),rcond=None)[0]
+    obs['mapping']['w2'] = np.linalg.lstsq(Phi,np.dot(normX,A.T),rcond=None)[0]
 
-    obs['b2'] = np.mean(data_mat)
+    obs['mapping']['b2'] = np.mean(data_mat, axis = 0)
+
     if obs['type'] == 'continuous':
-        if varargin == None:
+        if varargin != None:
             from sklearn.model_selection import train_test_split
             samp_train_data, samp_test_data = train_test_split(data_mat,
                                                        test_size = 0.25, random_state=42)
-            obs_pca = PCA(n = dim_latent)
+            obs_pca = PCA(n_components = dim_latent)
             obs_pca.fit(samp_train_data)
             samp_pcvec = np.transpose(obs_pca.components_)
-            projection = samp_train_data * PCvec
+            projection = np.dot(samp_train_data ,PCvec)
             obs = gtm_2d_init(net, obs, projection, samp_train_data)
         else:
-            obs['centres'] = rbffwd( net['X'], obs['mapping'])
+            obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])
 
         import sys
         realmax = sys.float_info.max
-        d = np.linalg.norm( obs['centres'] -  obs['centres']) + np.diag(np.ones(obs['centre'],1)*realmax)
-        sigma = np.mean(min(d))/2
-        if dim_latent < ncol :
-            sigma = min(sigma,PCcoeff[dim_latent+1])
-        obs['covars'] = sigma*np.ones((1,obs['centres']))
+        d = dist2(obs['mix']['centres'][0],obs['mix']['centres'][0]) + np.diag(np.ones(obs['mix']['ncentres'])*realmax)
+        sigma = np.mean(np.min(d,axis = 0))/2
+        # if dim_latent < ncol :
+        #     sigma = min(sigma,PCcoeff[dim_latent+1])
+        obs['covars'] = sigma*np.ones((1,obs['mix']['ncentres']))
 
     elif obs['type'] == 'discrete':
         if obs['dist_type'] == 'multinomial':
-            for i in range(0, np.shape(data['cat_nvals'])):
+            for i in range(0, len(data['cat_nvals'])):
                 W_tmp = ApplyPCAInitW(obs,data_mat[:,data['start_inds'][i]:data['end_inds'][i]],dim_latent,X)
-                obs['w2'][:,data['start_inds'][i]:data['end_inds'][i]] = W_tmp
-        else:
-            print('unkown data type.')
+                obs['mapping']['w2'][:,data['start_inds'][i]:data['end_inds'][i]] = W_tmp
+    else:
+        print('unkown data type.')
+
+    return net,obs
 
 
 
@@ -173,11 +178,10 @@ def ApplyPCAInitW(obs,tempdata,dim_latent,X):
     pca.fit(tempdata)
     PCcoeff = pca.explained_variance_
     PCvec = np.transpose(pca.components_)
-    A = PCvec[:,1:dim_latent]*np.diag(np.sqrt(PCcoeff[1:dim_latent]))
-    Phi = rn.rbffwd(X, obs['mapping'])[2]
-    normX = (X - np.ones(np.shape(X))*np.diag(np.mean(X)))*np.diag(1/np.std(X))
-    A_T = np.transpose(A)
-    w2 = np.linalg.lstsq(Phi,normX*A_T,rcond=None)[0]
+    A = np.dot(PCvec[:,0:dim_latent],np.diag(np.sqrt(PCcoeff[0:dim_latent])))
+    Phi = rn.rbffwd(obs['mapping'],X)[1]
+    normX = np.dot(np.dot(X - np.ones(np.shape(X)),np.diag(np.mean(X,axis=0))),np.diag(1/np.std(X, axis=0, ddof=1)))
+    w2 = np.linalg.lstsq(Phi,np.dot(normX,A.T),rcond=None)[0]
     return w2
 
 
@@ -207,9 +211,9 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
         if net['dim_latent'] == 1:
             net['X'] = np.arange(-1,1,l_samp_size - 1)
         elif net['dim_latent'] == 2:
-            net['X'] = rn.gtm_rctg(l_samp_size)
+            net['X'] = gtm_rctg(l_samp_size)
             # for i in range (len(net['obs_array'])):
-            #     net['obs_array'][i]['mapping']['c'] = rn.gtm_rctg(rbf_samp_size)
+            #     net['obs_array'][i]['mapping']['c'] = gtm_rctg(rbf_samp_size)
             #     print(net['obs_array'][i]['mapping']['c'])
         else:
             print('For regular sample, input dimension must be 1 or 2.')

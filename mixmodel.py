@@ -1,7 +1,6 @@
 import numpy as np
 import rbfnet as rn
-
-
+from utilities import *
 
 
 def gmm(dim, ncentres, covar_type):
@@ -68,7 +67,7 @@ def gmmactiv(mix, x):
     # mix_c = np.array(mix['centres'],dtype = object)
     # print(mix_c, mix_c.shape)
     # print(len(mix['centres'][0]), len(mix['centres'][0][1]))
-    n2 = rn.dist2(x, mix['centres']) # dist2
+    n2 = dist2(x, mix['centres']) # dist2
     n2 = np.array(n2)
     wi2 = np.ones((ndata,1))*  (2* mix['covars'])
     nr, nc = np.shape(wi2)
