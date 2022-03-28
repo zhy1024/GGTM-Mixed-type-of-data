@@ -336,6 +336,7 @@ def ggtmpost(net, data_array):
         obs = net['obs_array'][i]
         data = data_array[i]
         if obs['type'] == 'continuous':
+            print("aaaa")
             obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
         elif obs['type'] == 'dicrete':

@@ -21,7 +21,12 @@ def dist2(x,c):
     ncentres,dimc = np.shape(c)
     if (dimx != dimc):
         print("Data dimension does not match dimension of centres")
-    x_sq_T = np.transpose([a*a for a in (x)])
+
+    # if dimx != 2:
+    #     print("dimension of x is not 2!")
+
+    x_sq_T = np.transpose([[x[i][j] ** 2 for j in range(len(x[i]))] for i in range(len(x))])
+    print("aaa",x_sq_T.shape)
     sum_x = np.array([sum(a) for a in zip(*x_sq_T)]).reshape(-1,1)
     x2 = np.ones(ncentres,) * sum_x
     c_sq_T = np.transpose([a*a for a in (c)])

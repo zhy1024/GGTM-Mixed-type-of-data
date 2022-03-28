@@ -64,9 +64,7 @@ def gmmactiv(mix, x):
     
     ndata = np.shape(x)[0]
     a = np.zeros(ndata, mix['ncentres'])
-    # mix_c = np.array(mix['centres'],dtype = object)
-    # print(mix_c, mix_c.shape)
-    # print(len(mix['centres'][0]), len(mix['centres'][0][1]))
+    # print(mix['centres'])
     n2 = dist2(x, mix['centres']) # dist2
     n2 = np.array(n2)
     wi2 = np.ones((ndata,1))*  (2* mix['covars'])
