@@ -7,6 +7,12 @@ from collections import Counter
 from ggtminit import *
 from mixmodel import *
 
+np.random.seed(2)
+def standardization(data):
+    mu = np.mean(data, axis=0)
+    sigma = np.std(data, axis=0)
+    return (data - mu) / sigma
+
 dim_latent = 2
 latent_shape = [8,8]
 nlatent = np.prod(latent_shape)
@@ -34,7 +40,7 @@ v1 = cont_train_data['v1'].to_numpy()
 v2 = cont_train_data['v2'].to_numpy()
 v3 = cont_train_data['v3'].to_numpy()
 pre = {'mu':[np.mean(v1),np.mean(v2),np.mean(v3)], 'sigma':[1.,1.,1.]}
-cdata =  {'mat':cont_data, 'type' : 'continuous', 'nvar' : cont_data.shape[1]}
+cdata = {'mat':standardization(cont_data), 'type' : 'continuous', 'nvar' : cont_data.shape[1]}
 #mixture model
 cmix = {'type':'gmm', 'covar_type':'spherical'}
 

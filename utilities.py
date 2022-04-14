@@ -7,14 +7,13 @@ from collections import Counter
 def gtm_rctg(samp_size):
     xDim = samp_size[0]
     yDim = samp_size[1]
-    X,Y = np.meshgrid(np.linspace(0,xDim-1,xDim),np.linspace(yDim-1,0,xDim))
-    X = np.concatenate(X.T.reshape(-1,1))
-    Y = np.concatenate(Y.T.reshape(-1,1))
-    sample = np.array([X,Y])
-    maxXY = [np.max(X),np.max(Y)]
-    sample[0] = 2 * (sample[0]-maxXY[0]/2)/maxXY[0]
-    sample[1] = 2 * (sample[1]-maxXY[1]/2)/maxXY[1]
-    return sample.T
+    X, Y = np.meshgrid(np.arange(xDim), np.flip(np.arange(yDim)))
+    maxX = np.max(X)
+    maxY = np.max(Y)
+    sample = np.array(np.concatenate((X.T.flatten().reshape((-1, 1)), Y.T.flatten().reshape((-1, 1))), axis=1), dtype=np.float64)
+    sample[:, 0] = 2 * (sample[:, 0] - maxX / 2) / maxX
+    sample[:, 1] = 2 * (sample[:, 1] - maxY / 2) / maxY
+    return sample
 
 def dist2(x,c):
     ndata,dimx = np.shape(x)
@@ -26,7 +25,6 @@ def dist2(x,c):
     #     print("dimension of x is not 2!")
 
     x_sq_T = np.transpose([[x[i][j] ** 2 for j in range(len(x[i]))] for i in range(len(x))])
-    print("aaa",x_sq_T.shape)
     sum_x = np.array([sum(a) for a in zip(*x_sq_T)]).reshape(-1,1)
     x2 = np.ones(ncentres,) * sum_x
     c_sq_T = np.transpose([a*a for a in (c)])

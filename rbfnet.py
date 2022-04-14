@@ -94,11 +94,14 @@ def rbffwd(net, x):
 	and each pattern in which each row corresponds to a data point.
     """
 
-    ndata, date_dim = np.shape(x)
-    n2 = dist2(x,net['c'])
-    wi2 = np.ones((ndata,1)) * (2 * net['wi'])
+    ndata = np.shape(x)
+    n2 = np.zeros((ndata[0], net['c'].shape[0]), dtype=np.float64)
+    for i in range(ndata[0]):
+        for j in range(net['c'].shape[0]):
+            n2[i, j] = np.linalg.norm(x[i, :] - net['c'][j, :])
+    wi2 = np.ones((ndata[0],1))*(2*net['wi'])
     z = np.exp(-(n2/wi2))
-    a = np.dot(z,net['w2']) + np.ones((ndata,1))*net['b2']
+    a = np.matmul(z,net['w2']) + np.ones((ndata[0],1))*net['b2']
     return a, z, n2
 
 
@@ -130,7 +133,7 @@ def rbfprior(rbfunc, nin, nhidden, nout):
     else:
         print('Undefined activation function')
     nwts = nwts_layer1 + nwts_layer2
-    mask = np.hstack((np.zeros(nwts_layer1),np.ones(nwts_layer2)))
+    mask = np.concatenate((np.zeros((nwts_layer1, 1)), np.ones((nwts_layer2, 1))), axis=0)
     # indx = np.zeros((nwts, 2))
     # mark2 = nwts_layer1 + (nhidden * nout)
     # indx[nwts_layer1:mark2, 0] = np.ones((nhidden * nout,))

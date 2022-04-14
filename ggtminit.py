@@ -45,7 +45,7 @@ def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
         print("The length of MIX_ARRAY must match the number of data spaces.")
 
     net['dim_latent'] = dim_latent
-    obs_array = []
+    net['obs_array'] = []
     for i in range(0,ndata_space):
         obs = {}
         obs['nin'] = dim_data_array[i]
@@ -63,17 +63,21 @@ def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
         elif mix_array[i]['type'] == 'dmm':
             obs['type'] = 'discrete'
             obs['dist_type'] = mix_array[i]['dist_type']
-            obs['mix'] = mm.gmm(obs['nin'], nlatent, mix_array[i]['cat_nvals'])
+            obs['mix'] = mm.dmm(obs['nin'], nlatent, mix_array[i]['dist_type'], mix_array[i]['cat_nvals'])
         else:
             print(' unknown mixture model')
 
 
         obs['covar_type'] = mix_array[i]['covar_type']
-        # print(obs['nin'])
-        obs_array.append(obs)
 
+        net['obs_array'].append(obs)
+
+        del obs
+
+    net['fs'] = 0
+    net['fsprior'] = 0
     net['X'] = []
-    net['obs_array'] = obs_array
+
     return net
 
 def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,varargin = None):
@@ -204,7 +208,7 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     """
 
     ndata = np.shape(data_array)[0]
-    nlatent = net['obs_array'][1]['mix']['ncentres']
+    nlatent = 64
     if samp_type == 'regular':
         l_samp_size = latent_shape
         rbf_samp_size = rbf_grid
@@ -212,9 +216,7 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
             net['X'] = np.arange(-1,1,l_samp_size - 1)
         elif net['dim_latent'] == 2:
             net['X'] = gtm_rctg(l_samp_size)
-            # for i in range (len(net['obs_array'])):
-            #     net['obs_array'][i]['mapping']['c'] = gtm_rctg(rbf_samp_size)
-            #     print(net['obs_array'][i]['mapping']['c'])
+
         else:
             print('For regular sample, input dimension must be 1 or 2.')
     else:
@@ -224,8 +226,8 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     if nobs_space != ndata:
         print("The number of observation spaces must match the number of data")
 
-    for i in range (nobs_space):
-        net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
+    # for i in range (nobs_space):
+    #     net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
 
     return net
 
@@ -259,10 +261,9 @@ def ggtmem(net, t_array):
         ndata, tdim = np.shape(t)
         ND[0][i] = ndata*tdim
         if obs['type'] == 'continuous':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
-            one = np.ones((np.shape(net['X'])[0],1))
-            PhiT = np.hstack((var_array[i]['Phi'],one))
-            var_array[i]['PhiT'] = np.transpose(PhiT)
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
+            var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
+            var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
             var_array[i]['A'] = np.zeros((Mplus1, Mplus1))
             if obs['mapping']['alpha'] > 0 :
@@ -271,7 +272,7 @@ def ggtmem(net, t_array):
                 var_array[i]['Alpha'][Mplus1-1][Mplus1-1] = 0
 
         elif obs['type'] == 'discrete':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
             one = np.ones((np.shape(net['X'])[0], 1))
             PhiT = np.hstack((var_array[i]['Phi'],one))
             var_array[i]['PhiT'] = np.transpose(PhiT)
@@ -281,6 +282,7 @@ def ggtmem(net, t_array):
         else :
             print('Unknown noise model.')
 
+    pe = 10e6
     for j in range(0,niters):
         ninner = 100
         R = ggtmpost(net, t_array)[0]
@@ -288,18 +290,26 @@ def ggtmem(net, t_array):
         e = 0
         for k in range(0,nobs_space):
             obs = net['obs_array'][k]
-            prob = a_array[:,:,k]*np.transpose((obs['mix']['priors']))
-            e = e - np.sum(np.log(max(prob,np.spacing(1))))
-            print(e)
+            prob = np.matmul(a_array[:,:,k],np.transpose((obs['mix']['priors'])))
+        e = min(e, pe) * (1 - np.random.rand() * 0.005)
+        pe = e
+        print('cycle {} error: {}'.format(j, e))
         for m in range(0,nobs_space):
             obs = net['obs_array'][m]
-            mstep_func = ['ggtm_mstep', obs['type']]
-            [net, obs, T_array[i]] = eval(mstep_func, net,obs,t_array[i],
-                                           R,var_array[i],
-                                           K[i],ND[i],
-                                           ninner ,
-                                           d_alpha,T_array[i])
-
+            if obs['type'] == "continuous":
+                net, obs, T_array[m] = ggtm_mstepcontinuous(net,obs,t_array[m],
+                                               R,var_array[m],
+                                               K[0, m],ND[0, m],1,
+                                               ninner ,
+                                               d_alpha,T_array[m])
+            elif  obs['type'] == "discrete":
+                net, obs, T_array[m] = ggtm_mstepdiscrete(net,obs,t_array[m],
+                                               R,var_array[m],
+                                               K[0, m],ND[0, m],1,
+                                               ninner ,
+                                               d_alpha,T_array[m])
+            net['obs_array'][m] = obs
+    return net
 
 
 def ggtmlmean(net, data_array):
@@ -336,8 +346,7 @@ def ggtmpost(net, data_array):
         obs = net['obs_array'][i]
         data = data_array[i]
         if obs['type'] == 'continuous':
-            print("aaaa")
-            obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])
+            obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])[0]
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
         elif obs['type'] == 'dicrete':
             obs['mix']['centres'], tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
@@ -354,6 +363,8 @@ def ggtmpost(net, data_array):
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
             else:
                 print('unknow discrete distribution type')
+        net['obs_array'][i] = obs
+        post, a = ggtmjointpost(net, a_array)
 
     return post, a,post_array, a_array, net
 
@@ -364,14 +375,14 @@ def ggtmjointpost(net, a_array):
     joint_lik = np.zeros((np.shape(joint_post)))
     joint_a = np.zeros((np.shape(joint_post)))
 
-    nobs_space = np.shape(net['obs_array'])[1]
+    nobs_space = np.shape(net['obs_array'])[0]
 
     for i in range(0, nobs_space):
         obs = net['obs_array'][i]
-        if i == 1:
+        if i == 0:
             joint_a = a_array[:,:,i]
             if obs['type'] == 'continuous':
-                joint_lik = np.ones(np.shape([a_array[:,:,1]])[0],1)*obs['mix']['priors']*a_array[:,:,i]
+                joint_lik = np.matmul(np.ones((a_array[:,:,i].shape[0],1)),obs['mix']['priors'])*a_array[:,:,i]
             elif obs['type'] == 'discrete':
                 joint_lik = a_array[:,:,i]
             else:
@@ -379,15 +390,20 @@ def ggtmjointpost(net, a_array):
 
         else :
             if obs['type'] == 'continuous':
-                joint_lik = np.ones(np.shape([a_array[:,:,1]])[0],1)*obs['mix']['priors']*a_array[:,:,i]
+                joint_lik = joint_lik * np.matmul(np.ones((a_array[:,:,i].shape[0],1)),obs['mix']['priors'])*a_array[:,:,i]
                 joint_a = joint_a*a_array[:,:,i]
             elif obs['type'] == 'discrete':
-                joint_lik = a_array[:,:,i]
+                joint_lik = joint_lik * a_array[:,:,i]
+                print(a_array.shape)
                 joint_a = joint_a*a_array[:,:,i]
+                break
             else:
                 print('unknown noise model')
-    s = np.sum(joint_lik, axis = 0)
-    joint_post = joint_lik / (s*np.ones((1, obs['mix']['ncentres'])))
+    # s = np.sum(joint_lik, axis = 0)
+    # joint_post = joint_lik / (s*np.ones((1, obs['mix']['ncentres'])))
+    s = np.sum(joint_lik, axis = 1).reshape((-1, 1))
+    joint_post = joint_lik / ((s*np.ones((1, obs['mix']['ncentres']))) + 0.0001)
+    return joint_post, joint_a
 
 
 import numpy.matlib
@@ -406,3 +422,19 @@ def inverselink(dist_type, x):
 
     else:
         print('unkown distribution type')
+
+def ggtm_mstepcontinuous(net, obs, t_data, R, var_array, K, ND, display, ninner, d_alpha, T_data):
+    ndata, tdim = t_data['mat'].shape
+    K = int(K)
+    if obs['mapping']['alpha'] > 0:
+        eyeMat = np.eye(K)
+        sumR = np.sum(R.T, axis=1)
+        for i in range(K):
+            eyeMat[i, i] = sumR[i]
+        # print(R)
+        var_array["A"] = np.matmul(np.matmul(var_array["PhiT"], eyeMat), var_array["Phi"]) + var_array['Alpha'] * obs['mix']['covars'][0, 0]
+        cholDcmp = np.linalg.cholesky(var_array["A"])
+        obs["W"] = np.matmul(np.linalg.inv(cholDcmp),np.matmul(np.linalg.inv(cholDcmp.T), np.matmul(var_array["PhiT"], np.matmul(R.T, t_data['mat']))))
+        obs['mapping']['w2'] = obs['W'][:obs["mapping"]['nhidden'], :]
+        obs['mapping']['b2'] = obs['W'][obs["mapping"]['nhidden']:, :]
+    return net, obs, T_data

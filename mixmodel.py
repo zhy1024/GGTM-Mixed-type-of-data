@@ -64,9 +64,14 @@ def gmmactiv(mix, x):
     
     ndata = np.shape(x)[0]
     a = np.zeros(ndata, mix['ncentres'])
-    # print(mix['centres'])
-    n2 = dist2(x, mix['centres']) # dist2
-    n2 = np.array(n2)
+    n2 = np.zeros((ndata, mix['ncentres']), dtype=np.float64)
+
+    for i in range(ndata):
+        for j in range(mix['ncentres']):
+            n2[i, j] = np.linalg.norm(x[i, :] - mix['centres'][j, :])
+
+    # n2 = dist2(x, mix['centres']) # dist2
+    # n2 = np.array(n2)
     wi2 = np.ones((ndata,1))*  (2* mix['covars'])
     nr, nc = np.shape(wi2)
     for i in range(0, nr):
@@ -90,8 +95,8 @@ def gmmpost(mix,x):
     ndata = np.shape(x)[0]
     a = gmmactiv(mix, x)
     old_post = np.ones((ndata,1))*mix['priors']*a
-    s = np.sum(old_post, axis = 1) # s = sum(post,2)
-    post = old_post/(s*np.ones((1,mix['ncentres'])))
+    s = np.sum(old_post, axis = 1).reshape((-1, 1)) # s = sum(post,2)
+    post = old_post/(np.matmul(s,np.ones((1,mix['ncentres']))) + 0.000001)
     post = np.array(post)
                      
                      
@@ -150,28 +155,28 @@ def dmm(dim, ncentres, dist_type, nvalues, a = None, b = 1):
         mix['nvalues'] = 1
         mix['nin'] = dim
         mix['means'] = np.random.rand(ncentres, dim)
-        if a < 1:
-            print('a gives a singular prior')
-        else:
-            mix['a'] = a
-        if b < 1:
-            print('b gives a singular prior')
-        else:
-            mix['b'] = b
+        # if a < 1:
+        #     print('a gives a singular prior')
+        # else:
+        #     mix['a'] = a
+        # if b < 1:
+        #     print('b gives a singular prior')
+        # else:
+        #     mix['b'] = b
             
     elif dist_type == 'multinomial':
         mix['nvalues'] = nvalues
         mix['nin'] = np.sum(nvalues)
-        mix['mean'] = np.zeros((ncentres, dim))
+        mix['means'] = np.zeros((ncentres, dim))
         k = 0
-        a = np.shape(mix['nvalues'][1])
-        for i in range(0, a):
-            mix['means'][:,k+1:k+mix['nvaluse'][i]] = softmax(np.random.randn(ncentres,nvalues[i]))
+        # a = np.shape(mix['nvalues'][1])
+        for i in range(0, len(mix['nvalues'])):
+            mix['means'][:,k:k+mix['nvalues'][i]] = softmax(np.random.randn(ncentres,nvalues[i]))
             k = mix['nvalues'][i]
-            if a < 1:
-                print('a gives a singular prior')
-            else :
-                mix['a'] = a
+            # if a < 1:
+            #     print('a gives a singular prior')
+            # else :
+            #     mix['a'] = a
     else:
         print('unknown distribution.')
 
