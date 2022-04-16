@@ -321,6 +321,7 @@ def ggtmlmean(net, data_array):
     nobs_space = len(net['obs_array'])
     R = ggtmpost(net,data_array)[0]
     a_array = ggtmpost(net,data_array)[3]
+    print(R)
     means = np.matmul(R,net['X'])
 
     # lle = 0
