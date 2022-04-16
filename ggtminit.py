@@ -132,7 +132,7 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     PCcoeff = pca.explained_variance_
     PCvec = pca.components_.T
     A = np.dot(PCvec[:,0:dim_latent],np.diag(np.sqrt(PCcoeff[0:dim_latent])))
-    Phi = rn.rbffwd(obs['mapping'],X)[1]
+    Phi = rn.rbffwd(obs['mapping'],X)[2]
     x_std_array = 1/np.std(X, axis=0, ddof=1)
     x_mean_diag = np.diag(np.mean(X,axis = 0))
     temp1 = X - np.dot(np.ones(np.shape(X)),x_mean_diag)
@@ -284,8 +284,8 @@ def ggtmem(net, t_array):
     pe = 10e6
     for j in range(0,niters):
         ninner = 100
-        R = ggtmpost(net, t_array)[0]
-        a_array = ggtmpost(net,t_array)[3]
+        R, _, _, a_array, net = ggtmpost(net, t_array)
+        print(R)
         e = 0
         for k in range(0,nobs_space):
             obs = net['obs_array'][k]
@@ -348,7 +348,7 @@ def ggtmpost(net, data_array):
             obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])[0]
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
         elif obs['type'] == 'dicrete':
-            obs['mix']['centres'], tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
+            obs['mix']['centres'],_, tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
             Phi = [tmp_Phi, np.ones([np.shape(net['X'])[0],1])]
             W = [obs['mapping']['w2'], obs['mapping']['b2']]
             if obs['dist_type'] == 'bernoulli':
