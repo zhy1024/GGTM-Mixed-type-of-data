@@ -61,10 +61,11 @@ bmix = {'type': 'dmm', 'covar_type': 'spherical','dist_type': 'bernoulli','cat_n
 df_4 = pd.read_csv("mult_train_data.csv")
 mdata_mat = df_4.to_numpy()
 mul_data = mdata_mat[:,:-1]
+print((OnetoNcoding(mul_data))[0].shape)
 mdata = {'type': 'discrete', 'mat': (OnetoNcoding(mul_data))[0], 'cat_nvals': (OnetoNcoding(mul_data))[1]}
 mdata['nvar'] = mdata['mat'].shape[1];
 start_idx = np.cumsum(mdata['cat_nvals'][len(mdata['cat_nvals'])-2])[0]
-mdata['start_inds'] = [0,start_idx]
+mdata['start_inds'] = [1,start_idx+1]
 mdata['end_inds'] = np.cumsum(mdata['cat_nvals'])
 
 #Mixture model

@@ -273,12 +273,11 @@ def ggtmem(net, t_array):
 
         elif obs['type'] == 'discrete':
             var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
-            one = np.ones((np.shape(net['X'])[0], 1))
-            PhiT = np.hstack((var_array[i]['Phi'],one))
-            var_array[i]['PhiT'] = np.transpose(PhiT)
+            var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
+            var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
             var_array[i]['K'] = K[0][i]
-            obs['w'] = [obs['mapping']['w2'],obs['mapping']['b2']]
+            obs['w'] = np.concatenate((obs['mapping']['w2'],obs['mapping']['b2']), axis=0)
         else :
             print('Unknown noise model.')
 
@@ -338,9 +337,9 @@ def ggtmpost(net, data_array):
     """
     ntotaldata = np.shape(data_array)[0]
     nobs_space = np.shape(net['obs_array'])[0]
-    a = np.shape(data_array[0]['mat'])[0]
-    b = net['obs_array'][0]['mix']['ncentres']
-    post_array = np.zeros(shape = (a, b, nobs_space))
+    # a = np.shape(data_array[0]['mat'])[0]
+    # b = net['obs_array'][0]['mix']['ncentres']
+    post_array = np.zeros([np.shape(data_array[0]['mat'])[0], net['obs_array'][0]['mix']['ncentres'], nobs_space])
     a_array = np.zeros(shape = np.shape(post_array))
     for i in range(0,nobs_space):
         obs = net['obs_array'][i]
@@ -353,7 +352,7 @@ def ggtmpost(net, data_array):
             Phi = [tmp_Phi, np.ones([np.shape(net['X'])[0],1])]
             W = [obs['mapping']['w2'], obs['mapping']['b2']]
             if obs['dist_type'] == 'bernoulli':
-                obs.mix.means = rn.inverselink(obs['dist_type'],Phi*W)
+                obs.mix.means = inverselink(obs['dist_type'],Phi*W)
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
 
             elif obs['dist_type'] == 'multinomial':
@@ -365,7 +364,6 @@ def ggtmpost(net, data_array):
                 print('unknow discrete distribution type')
         net['obs_array'][i] = obs
         post, a = ggtmjointpost(net, a_array)
-
     return post, a,post_array, a_array, net
 
 
@@ -376,7 +374,6 @@ def ggtmjointpost(net, a_array):
     joint_a = np.zeros((np.shape(joint_post)))
 
     nobs_space = np.shape(net['obs_array'])[0]
-
     for i in range(0, nobs_space):
         obs = net['obs_array'][i]
         if i == 0:
@@ -394,9 +391,7 @@ def ggtmjointpost(net, a_array):
                 joint_a = joint_a*a_array[:,:,i]
             elif obs['type'] == 'discrete':
                 joint_lik = joint_lik * a_array[:,:,i]
-                print(a_array.shape)
                 joint_a = joint_a*a_array[:,:,i]
-                break
             else:
                 print('unknown noise model')
     # s = np.sum(joint_lik, axis = 0)

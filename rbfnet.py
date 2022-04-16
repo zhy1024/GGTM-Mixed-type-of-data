@@ -67,7 +67,7 @@ def rbfsetfw(net, scale):
 	basis functions do not have a width.
     """
     real_max = sys.float_info.max
-    cdist =  dist2(net['c'], net['c'])
+    cdist =  np.linalg.norm(net['c'] - net['c'])
     if scale > 0:
         cdist = cdist + real_max* np.eye(net['nhidden'])
         widths = scale*np.mean(np.min(cdist))

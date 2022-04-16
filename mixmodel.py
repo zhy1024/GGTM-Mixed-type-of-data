@@ -65,7 +65,6 @@ def gmmactiv(mix, x):
     ndata = np.shape(x)[0]
     a = np.zeros(ndata, mix['ncentres'])
     n2 = np.zeros((ndata, mix['ncentres']), dtype=np.float64)
-
     for i in range(ndata):
         for j in range(mix['ncentres']):
             n2[i, j] = np.linalg.norm(x[i, :] - mix['centres'][j, :])
@@ -98,8 +97,7 @@ def gmmpost(mix,x):
     s = np.sum(old_post, axis = 1).reshape((-1, 1)) # s = sum(post,2)
     post = old_post/(np.matmul(s,np.ones((1,mix['ncentres']))) + 0.000001)
     post = np.array(post)
-                     
-                     
+
     return [post, a]    
 
 
@@ -179,6 +177,7 @@ def dmm(dim, ncentres, dist_type, nvalues, a = None, b = 1):
             #     mix['a'] = a
     else:
         print('unknown distribution.')
+    return mix
 
 
 
@@ -189,11 +188,12 @@ def dmmactiv(mix,x):
     e = np.ones((ndata,1))
     if mix['dist_type'] == 'bernoulli':
         for m in range(mix['ncentres']):
-            a[:,m] =  np.prod(((e*(mix['means'][m,:]))**x)*
-                 ((e*(1-mix['means'][m,:]))**(1-x)), 2)
+            a[:,m] = np.prod(
+                (np.matmul(e, (mix['means'][m,:]).reshape((1, -1))) ** x)*(np.matmul(e, (1 - mix['means'][m,:]).reshape((1, -1))) ** (1 - x))
+                , 1)
     elif mix['dist_type'] == 'multinomial':
         for m in range(mix['ncentres']):
-            a[:,m] = np.prod(((e*(1-mix['means'][m,:]))**(1-x)), 2)
+            a[:, m] = np.prod(((e * (1 - mix['means'][m, :])) ** (1 - x)), 1)
     else:
         print('unknown distribution type.')
 
@@ -204,7 +204,7 @@ def dmmpost(mix,x):
     post = (np.ones(ndata)[0]*mix['priors']*a)
     s = np.sum(post, axis = 0)
     post = post/(s*np.ones((1,mix['ncenres'])))
-    return post
+    return post,a
 
 
 

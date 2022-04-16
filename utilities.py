@@ -58,3 +58,17 @@ def OnetoNcoding(data):
             Coded = np.hstack((Coded, OneFeatureCode))
 
     return Coded, Neachfeatures
+
+
+def inverselink(dist_type, x):
+    if dist_type == 'bernoulli':
+        y = 1 / (1 + np.exp(-x))
+    elif dist_type == 'multinomial':
+        x = x.T
+        n = x.shape[0]
+        x = x - np.repeat(np.max(x), n).reshape((-1, 1))
+        x = np.exp(x)
+        sort_sum = np.sum(np.sort(x))
+        y = x / np.repeat(sort_sum, n).reshape((-1, 1))
+        y = y.T
+    return y
