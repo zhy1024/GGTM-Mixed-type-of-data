@@ -285,11 +285,11 @@ def ggtmem(net, t_array):
     for j in range(0,niters):
         ninner = 100
         R, _, _, a_array, net = ggtmpost(net, t_array)
-        print(R)
         e = 0
         for k in range(0,nobs_space):
             obs = net['obs_array'][k]
             prob = np.matmul(a_array[:,:,k],np.transpose((obs['mix']['priors'])))
+            e = e - np.sum(np.array([np.log(max(_, np.spacing(1))) for _ in prob]))
         e = min(e, pe) * (1 - np.random.rand() * 0.005)
         pe = e
         print('cycle {} error: {}'.format(j, e))
@@ -318,17 +318,17 @@ def ggtmlmean(net, data_array):
 
     """
     ntotaldata = np.shape(data_array)[1]
-    nobs_space = np.shape(net['obs_array'])[1]
+    nobs_space = len(net['obs_array'])
     R = ggtmpost(net,data_array)[0]
     a_array = ggtmpost(net,data_array)[3]
-    means = R*net['X']
+    means = np.matmul(R,net['X'])
 
-    lle = 0
-    for i in range(nobs_space):
-        obs = net['obs_array'][i]
-        prob = a_array[:,:,i]*obs['mix']['priors']
-        lle = lle - np.sum(np.log(max(prob, np.eps)))
-    return lle, means
+    # lle = 0
+    # for i in range(nobs_space):
+    #     obs = net['obs_array'][i]
+    #     prob = a_array[:,:,i]*obs['mix']['priors']
+    #     lle = lle - np.sum(np.log(max(prob, np.eps)))
+    return means
 
 
 def ggtmpost(net, data_array):
@@ -349,14 +349,14 @@ def ggtmpost(net, data_array):
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
         elif obs['type'] == 'dicrete':
             obs['mix']['centres'],_, tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
-            Phi = [tmp_Phi, np.ones([np.shape(net['X'])[0],1])]
-            W = [obs['mapping']['w2'], obs['mapping']['b2']]
+            Phi = np.concatenate((tmp_Phi, np.ones([np.shape(net['X'])[0], 1])), axis=1)
+            W = np.concatenate((obs['mapping']['w2'], obs['mapping']['b2']), axis=0)
             if obs['dist_type'] == 'bernoulli':
                 obs.mix.means = inverselink(obs['dist_type'],Phi*W)
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
 
             elif obs['dist_type'] == 'multinomial':
-                for j in range(0,np.shape(data['cat_nvals'][1])):
+                for j in range(0,len(data['cat_nvals'])):
                     PhiW = Phi*W[:,data.start_inds[j]:data.end_inds[j]]
                     obs['mix']['means'][:,data.start_inds[j]:data.end_inds[j]] = inverselink(obs['dist_type'],PhiW)
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
@@ -409,14 +409,18 @@ def inverselink(dist_type, x):
     elif dist_type == 'multinomial':
         x = np.tranpose(x)
         n = np.shape(x)[0]
-        x = x - np.matlib.repmat(max(x),n,1)
+        # x = x - np.matlib.repmat(max(x),n,1)
+        x = x - np.repeat(np.max(x), n).reshape((-1, 1))
         x = np.exp(x)
-        x_sort = x.sort()
-        y = x/(np.matlib.repmat(np.sum(x_sort),n,1))
+        # x_sort = x.sort()
+        # y = x/(np.matlib.repmat(np.sum(x_sort),n,1))
+        sort_sum = np.sum(np.sort(x))
+        y = x / np.repeat(sort_sum, n).reshape((-1, 1))
         y = np.transpose(y)
 
     else:
         print('unkown distribution type')
+    return y
 
 def ggtm_mstepcontinuous(net, obs, t_data, R, var_array, K, ND, display, ninner, d_alpha, T_data):
     ndata, tdim = t_data['mat'].shape
@@ -433,3 +437,37 @@ def ggtm_mstepcontinuous(net, obs, t_data, R, var_array, K, ND, display, ninner,
         obs['mapping']['w2'] = obs['W'][:obs["mapping"]['nhidden'], :]
         obs['mapping']['b2'] = obs['W'][obs["mapping"]['nhidden']:, :]
     return net, obs, T_data
+
+
+def ggtm_mstepdiscrete(net, obs, t_data, R, var_array, K, ND, display, ninner, d_alpha, T_data):
+    Rt = np.matmul(R.T, T_data['mat'])
+    K = int(K)
+    eyeMat = np.eye(K)
+    sumR = np.sum(R.T, axis=1)
+    for i in range(K):
+        eyeMat[i, i] = sumR[i]
+    spdiagR = eyeMat
+    if obs['mix']['dist_type'] == 'bernoulli':
+        obs = ggtm_mstepbernoulli(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha)
+    elif obs['mix']['dist_type'] == 'multinomial':
+        obs = ggtm_mstepmultinomial(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha)
+    obs['mapping']['w2'] = obs['w'][:obs["mapping"]['nhidden'], :]
+    obs['mapping']['b2'] = obs['w'][obs["mapping"]['nhidden']:, :]
+    return net, obs, T_data
+
+def ggtm_mstepbernoulli(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha):
+    for j in range(ninner):
+        PhiW = np.matmul(var_array["Phi"], obs["w"])
+        obs["w"] = obs["w"] + d_alpha * np.matmul(var_array["PhiT"], (Rt - np.matmul(spdiagR, rn.inverselink("bernoulli", PhiW))))
+    return obs
+
+
+def ggtm_mstepmultinomial(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha):
+    for j in range(ninner):
+        for k in range(len(t_data['cat_nvals'])):
+            start_inds = t_data['start_inds'][k]
+            end_inds = t_data['end_inds'][k]
+            PhiW = np.matmul(var_array['Phi'], obs['w'][:, start_inds-1: end_inds])
+            obs['w'][:, start_inds-1: end_inds] = obs['w'][:, start_inds-1: end_inds]+d_alpha * np.matmul(var_array['PhiT'],
+                (Rt[:, start_inds-1:end_inds] - np.matmul(spdiagR, rn.inverselink('multinomial', PhiW))))
+    return obs
