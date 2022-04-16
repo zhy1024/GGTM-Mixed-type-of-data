@@ -261,7 +261,7 @@ def ggtmem(net, t_array):
         ndata, tdim = np.shape(t)
         ND[0][i] = ndata*tdim
         if obs['type'] == 'continuous':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
             var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
             var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
@@ -272,7 +272,7 @@ def ggtmem(net, t_array):
                 var_array[i]['Alpha'][Mplus1-1][Mplus1-1] = 0
 
         elif obs['type'] == 'discrete':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
             var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
             var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
