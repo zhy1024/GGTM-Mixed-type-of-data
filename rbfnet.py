@@ -29,8 +29,6 @@ def rbf(nin, nhidden, nout, rbfunc, outfunc , prior = None, beta = None):
     w = np.random.randn(1, rbf_net['nwts'])
     net = rbfunpak(rbf_net, w)
 
-    if rbfunc == ['gaussian']:
-        net['wi'] = np.ones(nhidden,)
     return net
 
 def rbfunpak(net, w):
@@ -102,7 +100,7 @@ def rbffwd(net, x):
     wi2 = np.ones((ndata[0],1))*(2*net['wi'])
     z = np.exp(-(n2/wi2))
     a = np.matmul(z,net['w2']) + np.ones((ndata[0],1))*net['b2']
-    return a, z, n2
+    return a, n2
 
 
 def rbfprior(rbfunc, nin, nhidden, nout):

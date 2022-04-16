@@ -132,7 +132,7 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     PCcoeff = pca.explained_variance_
     PCvec = pca.components_.T
     A = np.dot(PCvec[:,0:dim_latent],np.diag(np.sqrt(PCcoeff[0:dim_latent])))
-    Phi = rn.rbffwd(obs['mapping'],X)[2]
+    Phi = rn.rbffwd(obs['mapping'],X)[1]
     x_std_array = 1/np.std(X, axis=0, ddof=1)
     x_mean_diag = np.diag(np.mean(X,axis = 0))
     temp1 = X - np.dot(np.ones(np.shape(X)),x_mean_diag)
@@ -261,7 +261,7 @@ def ggtmem(net, t_array):
         ndata, tdim = np.shape(t)
         ND[0][i] = ndata*tdim
         if obs['type'] == 'continuous':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
             var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
             var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
@@ -272,7 +272,7 @@ def ggtmem(net, t_array):
                 var_array[i]['Alpha'][Mplus1-1][Mplus1-1] = 0
 
         elif obs['type'] == 'discrete':
-            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[2]
+            var_array[i]['Phi'] = rn.rbffwd(obs['mapping'], net['X'])[1]
             var_array[i]['Phi'] = np.concatenate((var_array[i]['Phi'], np.ones((np.shape(net['X'])[0], 1))), axis=1)
             var_array[i]['PhiT'] = var_array[i]['Phi'].T
             K[0][i], Mplus1 = np.shape(var_array[i]['Phi'])
@@ -317,7 +317,7 @@ def ggtmlmean(net, data_array):
     NET, and computes the means of the responsibility distributions for each data point in each data in DATA_ARRAY.
 
     """
-    ntotaldata = np.shape(data_array)[1]
+    # ntotaldata = np.shape(data_array)[0]
     nobs_space = len(net['obs_array'])
     R = ggtmpost(net,data_array)[0]
     a_array = ggtmpost(net,data_array)[3]
@@ -347,23 +347,22 @@ def ggtmpost(net, data_array):
         if obs['type'] == 'continuous':
             obs['mix']['centres'] = rn.rbffwd(obs['mapping'], net['X'])[0]
             post_array[:,:,i], a_array[:,:,i] = mm.gmmpost(obs['mix'], data['mat'])
-        elif obs['type'] == 'dicrete':
-            obs['mix']['centres'],_, tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
+        elif obs['type'] == 'discrete':
+            obs['mix']['centres'], tmp_Phi = rn.rbffwd(obs['mapping'],net['X'])
             Phi = np.concatenate((tmp_Phi, np.ones([np.shape(net['X'])[0], 1])), axis=1)
             W = np.concatenate((obs['mapping']['w2'], obs['mapping']['b2']), axis=0)
             if obs['dist_type'] == 'bernoulli':
-                obs.mix.means = inverselink(obs['dist_type'],Phi*W)
+                obs['mix']['mean']  = inverselink(obs['dist_type'],np.matmul(Phi,W))
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
-
             elif obs['dist_type'] == 'multinomial':
                 for j in range(0,len(data['cat_nvals'])):
-                    PhiW = Phi*W[:,data.start_inds[j]:data.end_inds[j]]
-                    obs['mix']['means'][:,data.start_inds[j]:data.end_inds[j]] = inverselink(obs['dist_type'],PhiW)
+                    PhiW = np.matmul(Phi,W[:,data['start_inds'][j]:data['end_inds'][j]])
+                    obs['mix']['means'][:,data['start_inds'][j]:data['end_inds'][j]] = inverselink(obs['dist_type'],PhiW)
                 post_array[:,:,i], a_array[:,:,i] = mm.dmmpost(obs['mix'],data['mat'])
             else:
                 print('unknow discrete distribution type')
         net['obs_array'][i] = obs
-        post, a = ggtmjointpost(net, a_array)
+    post, a = ggtmjointpost(net, a_array)
     return post, a,post_array, a_array, net
 
 
@@ -407,7 +406,7 @@ def inverselink(dist_type, x):
         y = 1/(1+np.exp(-x))
 
     elif dist_type == 'multinomial':
-        x = np.tranpose(x)
+        x = x.T
         n = np.shape(x)[0]
         # x = x - np.matlib.repmat(max(x),n,1)
         x = x - np.repeat(np.max(x), n).reshape((-1, 1))
@@ -416,7 +415,7 @@ def inverselink(dist_type, x):
         # y = x/(np.matlib.repmat(np.sum(x_sort),n,1))
         sort_sum = np.sum(np.sort(x))
         y = x / np.repeat(sort_sum, n).reshape((-1, 1))
-        y = np.transpose(y)
+        y = y.T
 
     else:
         print('unkown distribution type')

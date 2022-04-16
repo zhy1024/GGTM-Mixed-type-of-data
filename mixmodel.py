@@ -204,7 +204,7 @@ def dmmpost(mix,x):
     ndata = np.shape(x)[0]
     post = (np.ones(ndata)[0]*mix['priors']*a)
     s = np.sum(post, axis = 0)
-    post = post/(s*np.ones((1,mix['ncenres'])))
+    post = post/(s*np.ones((1,mix['ncentres'])))
     return post,a
 
 

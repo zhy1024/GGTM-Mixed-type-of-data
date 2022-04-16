@@ -2,7 +2,7 @@
 from os import name
 import pandas as pd
 import numpy as np
-import matplotlib as plt
+import matplotlib.pyplot as plt
 from collections import Counter
 from ggtminit import *
 from mixmodel import *
@@ -34,6 +34,7 @@ map['prior'] = rbf_prior
 #Data loading
 #Continuous data
 df_1 = pd.read_csv("cont_train_data.csv")
+labels = df_1['Label'].drop(index = 0).astype(float).to_numpy()
 cont_train_data = df_1.drop(index = 0, columns = ['ID','Label']).astype(float)
 cont_data = cont_train_data.to_numpy()
 v1 = cont_train_data['v1'].to_numpy()
@@ -61,7 +62,6 @@ bmix = {'type': 'dmm', 'covar_type': 'spherical','dist_type': 'bernoulli','cat_n
 df_4 = pd.read_csv("mult_train_data.csv")
 mdata_mat = df_4.to_numpy()
 mul_data = mdata_mat[:,:-1]
-print((OnetoNcoding(mul_data))[0].shape)
 mdata = {'type': 'discrete', 'mat': (OnetoNcoding(mul_data))[0], 'cat_nvals': (OnetoNcoding(mul_data))[1]}
 mdata['nvar'] = mdata['mat'].shape[1];
 start_idx = np.cumsum(mdata['cat_nvals'][len(mdata['cat_nvals'])-2])[0]
@@ -86,12 +86,16 @@ net = ggtm(dim_latent, nlatent, dim_data_array, map, mix_array)
 
 net = ggtminit(net, data_array, samp_type, latent_shape,rbf_grid)
 
-[net, options] = ggtmem(net, data_array)
+net = ggtmem(net, data_array)
 # Posterior means
 means = ggtmlmean(net, data_array)
-plt.plot(means[:, ], means[:, 2], 'k.')
 
 
 
 if __name__ == "__main__" :
-    plt.plot(means[:, ], means[:, 2], 'k.')
+    color_map = ['r', 'g', 'b', 'k']
+    marker_map = ['+', '^', 's', '.']
+    for i in range(0, means.shape[0]):
+        plt.scatter(means[i, 0] + (np.random.rand() - 0.5) * 0.01, means[i, 1] + (np.random.rand() - 0.5) * 0.01,
+                    color=color_map[int(labels[i])-1], marker=marker_map[int(labels[i])-1])
+    plt.show()
