@@ -196,6 +196,7 @@ def dmmactiv(mix,x):
             a[:, m] = np.prod(((e * (1 - mix['means'][m, :])) ** (1 - x)), 1)
     else:
         print('unknown distribution type.')
+    return a
 
 def dmmpost(mix,x):
     """return the posterior of discrete data"""
