@@ -226,8 +226,8 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
     if nobs_space != ndata:
         print("The number of observation spaces must match the number of data")
 
-    for i in range (nobs_space):
-        net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
+    # for i in range (nobs_space):
+    #     net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
 
     return net
 
