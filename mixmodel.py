@@ -195,7 +195,7 @@ def dmmactiv(mix,x):
         for m in range(mix['ncentres']):
             a[:, m] = np.prod(((e * (1 - mix['means'][m, :])) ** (1 - x)), 1)
     else:
-        print('unknown distribution type.')
+        F('unknown distribution type.')
     return a
 
 def dmmpost(mix,x):

@@ -25,13 +25,24 @@ def dist2(x,c):
     #     print("dimension of x is not 2!")
 
     x_sq_T = np.transpose([[x[i][j] ** 2 for j in range(len(x[i]))] for i in range(len(x))])
-    sum_x = np.array([sum(a) for a in zip(*x_sq_T)]).reshape(-1,1)
-    x2 = np.ones(ncentres,) * sum_x
+    sum_x = np.array([sum(a) for a in zip(*x_sq_T)])
+    ones = np.ones(ncentres,)
+    x2 = np.zeros((ndata,ndata))
+    for i in range (ncentres):
+        for j in range (ndata):
+            x2[i][j] = ones[i] * sum_x[j]
+    # x2 =np.dot(np.ones(ncentres,), sum_x)
+
     c_sq_T = np.transpose([a*a for a in (c)])
-    sum_c = np.array([sum(a) for a in zip(*c_sq_T)]).reshape(-1,1)
-    c2 = np.transpose(np.ones(ndata,) * sum_c)
+    sum_c = np.array([sum(a) for a in zip(*c_sq_T)])
+    # c2 = np.transpose(np.ones(ndata,) * sum_c)
+    c2 = np.zeros((ndata, ncentres))
+    for i in range (ndata):
+        for j in range (ncentres):
+            c2[i][j] = ones[i] * sum_c[j]
+
     temp = 2 * np.dot(x, np.transpose(c))
-    n2 = x2+c2-temp
+    n2 = x2.T+c2-temp
     return n2
 
 def OnetoNcoding(data):

@@ -124,7 +124,7 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
         if dim_latent == 2:
             obs['mapping']['c'] = gtm_rctg(rbf_samp_size)
             obs['mapping'] = rn.rbfsetfw(obs['mapping'], 1)
-            # print(obs['mapping']['w2'])
+        # print(obs['mapping'])
 
     from sklearn.decomposition import PCA
     pca = PCA()
@@ -137,8 +137,8 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     x_mean_diag = np.diag(np.mean(X,axis = 0))
     temp1 = X - np.dot(np.ones(np.shape(X)),x_mean_diag)
     normX = np.dot(temp1,np.diag(x_std_array))
+    print(Phi)
     obs['mapping']['w2'] = np.linalg.lstsq(Phi,np.dot(normX,A.T),rcond=None)[0]
-
     obs['mapping']['b2'] = np.mean(data_mat, axis = 0)
 
     if obs['type'] == 'continuous':
@@ -228,7 +228,7 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
 
     # for i in range (nobs_space):
     #     net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
-
+    #     # print(net['obs_array'][i])
     return net
 
 
