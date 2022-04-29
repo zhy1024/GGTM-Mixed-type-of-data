@@ -67,7 +67,6 @@ def OnetoNcoding(data):
             Coded = OneFeatureCode
         else:
             Coded = np.hstack((Coded, OneFeatureCode))
-
     return Coded, Neachfeatures
 
 
