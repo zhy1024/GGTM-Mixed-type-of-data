@@ -7,15 +7,30 @@ from collections import Counter
 def gtm_rctg(samp_size):
     xDim = samp_size[0]
     yDim = samp_size[1]
+    # Produce a grid with the right number of rows and columns
     X, Y = np.meshgrid(np.arange(xDim), np.flip(np.arange(yDim)))
+    # Change grid representation
     maxX = np.max(X)
     maxY = np.max(Y)
+    # Shift grid to correct position and scale it
     sample = np.array(np.concatenate((X.T.flatten().reshape((-1, 1)), Y.T.flatten().reshape((-1, 1))), axis=1), dtype=np.float64)
     sample[:, 0] = 2 * (sample[:, 0] - maxX / 2) / maxX
     sample[:, 1] = 2 * (sample[:, 1] - maxY / 2) / maxY
     return sample
 
 def dist2(x,c):
+    '''
+    DIST2	Calculates squared distance between two sets of points.
+
+	Description
+	D = DIST2(X, C) takes two matrices of vectors and calculates the
+	squared Euclidean distance between them.  Both matrices must be of
+	the same column dimension.  If X has M rows and N columns, and C has
+	L rows and N columns, then the result has M rows and L columns.  The
+	I, Jth entry is the  squared distance from the Ith row of X to the
+	Jth row of C.
+    '''
+
     ndata,dimx = np.shape(x)
     ncentres,dimc = np.shape(c)
     if (dimx != dimc):
@@ -71,6 +86,12 @@ def OnetoNcoding(data):
 
 
 def inverselink(dist_type, x):
+    '''
+    this is a function which is needed when non-Gaussian noise model is included
+    x is assumed a KxT matrix and e.g. softmax will take T-dimensional columns
+    the output will have the same dimensionality as x.
+    '''
+
     if dist_type == 'bernoulli':
         y = 1 / (1 + np.exp(-x))
     elif dist_type == 'multinomial':

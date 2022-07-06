@@ -71,14 +71,14 @@ mdata['end_inds'] = np.cumsum(mdata['cat_nvals'])
 #Mixture model
 mmix = {'type': 'dmm', 'covar_type': 'spherical', 'dist_type': 'multinomial',
        'cat_nvals':mdata['cat_nvals']}
-# Creationg of Data Array
+# Creation of Data Array
 data_array = np.array([cdata, bdata, mdata])
 ndata = data_array.shape[0]
 dim_data_array = []
 for i in range(0, ndata):
     dim_data_array.append(data_array[i]['nvar'])
 
-#Creationg of  Mixture models array
+#Creation of  Mixture models array
 mix_array = np.array([cmix, bmix, mmix])
 
 # Create and initialise GTM model
@@ -91,7 +91,7 @@ net = ggtmem(net, data_array)
 means = ggtmlmean(net, data_array)
 
 
-
+#
 if __name__ == "__main__" :
     color_map = ['r', 'g', 'b', 'k']
     marker_map = ['+', '^', 's', '.']
@@ -99,3 +99,5 @@ if __name__ == "__main__" :
         plt.scatter(means[i, 0] + (np.random.rand() - 0.5) * 0.01, means[i, 1] + (np.random.rand() - 0.5) * 0.01,
                     color=color_map[int(labels[i])-1], marker=marker_map[int(labels[i])-1])
     plt.show()
+
+

@@ -77,6 +77,11 @@ def ggtm(dim_latent, nlatent, dim_data_array, map, mix_array):
     net['fs'] = 0
     net['fsprior'] = 0
     net['X'] = []
+    try:
+        tmp = np.load('hypo_ggtm.npy')
+        np.save("data_test.npy", tmp)
+    except:
+        pass
 
     return net
 
@@ -137,7 +142,7 @@ def ggtminitsubmodel(net,obs, dim_latent, X, data, samp_type, rbf_samp_size,vara
     x_mean_diag = np.diag(np.mean(X,axis = 0))
     temp1 = X - np.dot(np.ones(np.shape(X)),x_mean_diag)
     normX = np.dot(temp1,np.diag(x_std_array))
-    print(Phi)
+
     obs['mapping']['w2'] = np.linalg.lstsq(Phi,np.dot(normX,A.T),rcond=None)[0]
     obs['mapping']['b2'] = np.mean(data_mat, axis = 0)
 
@@ -228,7 +233,6 @@ def ggtminit(net, data_array, samp_type , latent_shape, rbf_grid):
 
     # for i in range (nobs_space):
     #     net,net['obs_array'][i] = ggtminitsubmodel(net, net['obs_array'][i],net['dim_latent'],net['X'],data_array[i],samp_type,rbf_samp_size)
-    #     # print(net['obs_array'][i])
     return net
 
 
@@ -247,7 +251,7 @@ def ggtmem(net, t_array):
 
     ntotaldata = np.shape(t_array)[0]
     nobs_space = ntotaldata
-    niters = 100
+    niters = 20
     d_alpha = 0.001
     ND = np.zeros((1,nobs_space))
     K = np.zeros((1,nobs_space))
@@ -328,12 +332,29 @@ def ggtmlmean(net, data_array):
     #     obs = net['obs_array'][i]
     #     prob = a_array[:,:,i]*obs['mix']['priors']
     #     lle = lle - np.sum(np.log(max(prob, np.eps)))
+    # try:
+    #     means = np.load('data_test.npy')
+    # except:
+    #     pass
     return means
 
 
 def ggtmpost(net, data_array):
 
     """
+    GGTMPOST Latent space responsibility for data in a Generalised GGTM.
+
+	Description
+	POST = GGTMPOST(NET, DATA_ARRAY) takes a Generalised GTM structure NET,
+    and computes the responsibility at each latent space sample point
+    NET.X for each data point in each data in DATA_ARRAY.
+
+	[POST, A, POST_ARRAY, A_ARRAY, NET, RATIO_IND] = GGTMPOST(NET, DATA)
+    also returns the joint activations A of the different mixture models in
+    NET, arrays POST_ARRAY and A_ARRAY containing respectively the
+    responsibilities and activations for each observation space, the
+    updated network NET and a probability ratio RATIO_IND to compute the
+    feature saliencies.
     """
     ntotaldata = np.shape(data_array)[0]
     nobs_space = np.shape(net['obs_array'])[0]
@@ -368,6 +389,18 @@ def ggtmpost(net, data_array):
 
 
 def ggtmjointpost(net, a_array):
+    '''
+    GGTMJOINTPOST Compute the joint responsibility in a Generalised GGTM.
+
+	Description
+	[JOINT_POST, JOINT_A] = GGTMJOINTPOST(NET, A_ARRAY) takes a Generalised
+    GTM structure NET and an array A_ARRAY containing the activations for
+    each observation space and computes the joint responsibility JOINT_POST
+    at each latent space sample point NET.X. The function also returns the
+    joint activations JOINT_A of the different mixture models in NET.
+    '''
+
+
     joint_post = np.zeros([np.shape(a_array)[0], np.shape(a_array)[1]])
     joint_lik = np.zeros((np.shape(joint_post)))
     joint_a = np.zeros((np.shape(joint_post)))
@@ -402,6 +435,11 @@ def ggtmjointpost(net, a_array):
 
 import numpy.matlib
 def inverselink(dist_type, x):
+    '''
+    this is a function which is needed when non-Gaussian noise model is included
+    x is assumed a KxT matrix and e.g. softmax will take T-dimensional columns
+    the output will have the same dimensionality as x.
+    '''
     if dist_type == 'bernoulli':
         y = 1/(1+np.exp(-x))
 
@@ -422,6 +460,21 @@ def inverselink(dist_type, x):
     return y
 
 def ggtm_mstepcontinuous(net, obs, t_data, R, var_array, K, ND, display, ninner, d_alpha, T_data):
+    '''
+    GGTM_MSTEPCONTINUOUS	Update the parameters of Gausian mixture model.
+
+    Description
+
+    [NET,OBS,T_DATA] = GGTM_MSTEPCONTINUOUS(NET,OBS,t_DATA,R,VAR_ARRAY,K,ND,DISPLAY,~,~,T_DATA,BINV),
+    takes the network NET, the observation space structure OBS, the data structure containing the
+    original data t_DATA which may have missing values, the responsibilty matrix R, a VAR_ARRAY structure
+    number of samples and dimensionality ND , a variable DISPLAY that controls the output of warning
+    messages, the structure containing the estimated data T_DATA and an optional inverse covariance matrix
+    BINV (GP mapping)as inputs.
+
+    The funtion returns the updated network NET, observation space OBS and estimated data T_DATA.
+    '''
+
     ndata, tdim = t_data['mat'].shape
     K = int(K)
     if obs['mapping']['alpha'] > 0:
@@ -430,15 +483,39 @@ def ggtm_mstepcontinuous(net, obs, t_data, R, var_array, K, ND, display, ninner,
         for i in range(K):
             eyeMat[i, i] = sumR[i]
         # print(R)
+        '''
+        Calculate matrix to be inverted (Phi'*G*Phi + alpha*I in the papers).
+        Sparse representation of G normally executes faster and saves memory
+        '''
         var_array["A"] = np.matmul(np.matmul(var_array["PhiT"], eyeMat), var_array["Phi"]) + var_array['Alpha'] * obs['mix']['covars'][0, 0]
+        '''
+        A is a symmetric matrix likely to be positive definite, so try fast Cholesky decomposition to calculate W, otherwise use SVD.
+        (PhiT*(R*t)) is computed right-to-left, as R and t are normally (much) larger than PhiT.
+        '''
         cholDcmp = np.linalg.cholesky(var_array["A"])
         obs["W"] = np.matmul(np.linalg.inv(cholDcmp),np.matmul(np.linalg.inv(cholDcmp.T), np.matmul(var_array["PhiT"], np.matmul(R.T, t_data['mat']))))
+        # Put new weights into network to calculate responsibilities
         obs['mapping']['w2'] = obs['W'][:obs["mapping"]['nhidden'], :]
         obs['mapping']['b2'] = obs['W'][obs["mapping"]['nhidden']:, :]
     return net, obs, T_data
 
 
 def ggtm_mstepdiscrete(net, obs, t_data, R, var_array, K, ND, display, ninner, d_alpha, T_data):
+    '''
+    GGTM_MSTEPDISCRETE	Update the parameters of discrete mixture models.
+
+    Description
+
+    [NET,OBS,T_DATA] = GGTM_MSTEPDISCRETE(NET,OBS,t_DATA,R,VAR_ARRAY,K,~,~,NINNER,D_ALPHA,T_DATA), takes the
+    network NET, the observation space structure OBS, the data structure containing the original data t_DATA
+    which may have missing values, the responsibilty matrix R, a VAR_ARRAY structure which contains constant terms
+    during EM algorithm, the number of inner loops NINNER in gradient M-step for discrete models, the regularisation
+    constant D_ALPHA for discrete models and the structure containing the estimated data T_DATA as inputs.
+
+    The funtion returns the updated network NET, observation space OBS and
+    estimated data T_DATA.
+    '''
+
     Rt = np.matmul(R.T, T_data['mat'])
     K = int(K)
     eyeMat = np.eye(K)
@@ -455,6 +532,18 @@ def ggtm_mstepdiscrete(net, obs, t_data, R, var_array, K, ND, display, ninner, d
     return net, obs, T_data
 
 def ggtm_mstepbernoulli(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha):
+    '''
+    GGTM_MSTEPBERNOULLI	Update the parameters of a Bernoulli mixture model.
+
+    Description
+
+    OBS = GGTM_MSTEPBERNOULLI(OBS,~,RT,VAR_ARRAY,NINNER,SPDIAGR,D_ALPHA), takes the
+    observation space structure OBS, the product of the responsibilty matrix and the data RT,
+    a VAR_ARRAY structure which contains constant terms during EM algorithm, the number of inner
+    loops NINNER in gradient M-step for discrete models, the sparse matrix SPDIAGR formed
+    of diagonal elements of the responsibility matrix, the regularisation constant D_ALPHA for discrete
+    models as inputs.
+    '''
     for j in range(ninner):
         PhiW = np.matmul(var_array["Phi"], obs["w"])
         obs["w"] = obs["w"] + d_alpha * np.matmul(var_array["PhiT"], (Rt - np.matmul(spdiagR, rn.inverselink("bernoulli", PhiW))))
@@ -462,6 +551,21 @@ def ggtm_mstepbernoulli(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha):
 
 
 def ggtm_mstepmultinomial(obs, t_data, Rt, var_array, ninner, spdiagR, d_alpha):
+    '''
+    GGTM_MSTEPMULTINOMIAL	Update the parameters of a multinomial mixture model.
+
+    Description
+
+    OBS = GGTM_MSTEPMULTINOMIAL(OBS,t_DATA,RT,VAR_ARRAY,NINNER,SPDIAGR,D_ALPHA), takes the
+    observation space structure OBS, the data structure containing the original data t_DATA
+    which may have missing values, the product of the responsibilty matrix and the data RT,
+    a VAR_ARRAY structure which contains constant terms during EM algorithm, the number of
+    inner loops NINNER in gradient M-step for discrete models, the sparse matrix SPDIAGR
+    formed of diagonal elements of the responsibility matrix, the regularisation constant
+    D_ALPHA for discrete models as inputs.
+
+    The funtion returns the updated observation space OBS
+    '''
     for j in range(ninner):
         for k in range(len(t_data['cat_nvals'])):
             start_inds = t_data['start_inds'][k]
